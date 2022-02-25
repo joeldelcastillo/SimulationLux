@@ -1,4 +1,8 @@
 import peasy.*;
+import processing.serial.*;
+
+Serial myPort;  // The serial port
+int nl = 10;
 
 PeasyCam cam;
 
@@ -34,21 +38,24 @@ float ymouse;
 
 PVector prevMousePos = new PVector(mouseX, mouseY);
 PVector prevMouseVel = new PVector(0, 0);
+PVector gyro = new PVector(0, 0, 0);
 float lastTime = 0;
 float delta = 0;
 
 
-void settings() {
-  size(width, height, "processing.opengl.PGraphics3D");
-}
 
 
 void setup() {
 
-  size(width, height, P3D);
+  fullScreen("processing.opengl.PGraphics3D");
   cam = new PeasyCam(this, 500);
   colorMode(HSB, TWO_PI);
   globe = new PVector [total][60];
+
+    // List all the available serial ports
+  printArray(Serial.list());
+  // Open the port you are using at the rate you want:
+  myPort = new Serial(this, Serial.list()[0], 115200);
 
   for (int i = 1; i < total; i++) {
     float alpha = map(i, 0, total, 0, PI);
@@ -67,32 +74,38 @@ void setup() {
 }
 
 void draw() {
-  background(0);
+
+  while (myPort.available() > 0) {
+    String array = myPort.readStringUntil(nl);
+    float[] nums = {0,0,0};
+    try   { 
+      nums = float(split(array, ','));
+        gyro.setX(nums[0]);            
+    } 
+    catch(NullPointerException e)   { 
+        System.out.print("Caught NullPointerException"); 
+        gyro.set(0, 0, 0); 
+    } 
+
+    background(0);
   stroke(255);
   lights();
 
-  float targetX = mouseX;
-  float dx = targetX - xmouse;
-  xmouse += dx * easing;
-  
-  float targetY = mouseY;
+  float voly = gyro.x;
+  float targetY = voly;
   float dy = targetY - ymouse;
   ymouse += dy * easing;
+  
+  float volx = gyro.z;
+  float targetX = volx;
+  float dx = targetX - xmouse;
+  xmouse += dx * easing;
 
-  float velocityY;
-  delta = (millis()- lastTime);
-  velocityY = (ymouse - prevMousePos.y)* 0.05;
-  prevMousePos.x = xmouse;
-  prevMousePos.y = ymouse;
-
-  // float mouse = map(xmouse, 0, width, 0, 2);
-  float mouse1 = map(ymouse, 0, height, 0, 2);
-  float mouse2 = map(xmouse, 0, width, 0, 2);
 
   //-------------------------Move main point give mouse
   float newR = radius * 1.4;
-  float b = map(mouseX, 0, width, 0, 2* PI);
-  float a = map(mouseY, 0, height, 0, PI);
+  float b = map(ymouse, -180, 180, -4* PI, 4* PI);
+  float a = map(xmouse, -180, 180, -4* PI, 4* PI);
   float xm = newR * sin(a) * cos(b);
   float ym = newR * sin(a) * sin(b);
   float zm = newR * cos(a);
@@ -131,7 +144,7 @@ void draw() {
       float y = (radius ) * sin(alpha) * sin(beta);
       float z = (radius ) * cos(alpha);
 
-      float hu = map(distance * 0.2, -150, 150, 0 - PI/2 , TWO_PI + PI/2);
+      float hu = map(distance * 0.2, -150, 150, 0 - PI , TWO_PI + PI);
       stroke(hu, 255, 255);
 
       globe[i][j] = new PVector(x, y, z);
@@ -145,14 +158,17 @@ void draw() {
     }
     endShape();
   }
+
+  // prevMousePos = mousePos;
+  // prevMouseVel = mouseVel;
+
+  }
+  
   phase += speed;
   times++;
 
   //-------------------
 
   lastTime = millis(); 
-  // prevMousePos = mousePos;
-  // prevMouseVel = mouseVel;
-
 
 }
